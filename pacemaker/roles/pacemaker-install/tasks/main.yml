@@ -1,0 +1,48 @@
+---
+- name: Instalar paquetes
+  yum:
+    name: "{{ item }}"
+    state: present
+  with_items:
+   - epel-release
+   - corosync
+   - pacemaker
+   - pcs
+   - pacemaker-cli
+   - pacemaker-cluster-libs
+   - pacemaker-cts
+   - pacemaker-libs
+   - pacemaker-remote
+   - unzip
+   - git
+   - libsemanage-python
+   - vim
+
+     #- name: Enable pacemaker to be started at boot
+     #  service:
+     #    name: pacemaker
+     #    enabled: yes
+     #    state: started
+
+    #- name: Enable corosync to be started at boot
+    #  service:
+    #    name: corosync
+    #    enabled: yes
+    #    state: started
+
+- name: Enable pcsd to be started at boot
+  service:
+    name: pcsd
+    enabled: yes
+    state: started
+
+- name: creando cluster pacemaker
+  service:
+    name: pcsd
+    enabled: yes
+    state: started
+
+    #- name: creando cluster pacemaker
+    #  pacemaker:
+    #    cluster_name: 'test-cluster'
+

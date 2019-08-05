@@ -1,0 +1,19 @@
+---
+# This playbook deploys a simple standalone JBoss server.
+
+#- hosts: all
+#  roles:
+#    - pacemaker-install
+
+      #- hosts: master
+      #  roles:
+      #    - pacemaker-config
+
+- hosts: all
+  roles:
+    - ondrejhome.ha-cluster-pacemaker
+
+- hosts: master
+  roles:
+    - pacemaker-config
+

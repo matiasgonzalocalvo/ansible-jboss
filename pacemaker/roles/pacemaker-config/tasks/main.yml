@@ -1,0 +1,40 @@
+---
+- name: check stonith
+  shell: pcs property list stonith-enabled
+  register: stonith
+
+- name: deshabilito el stonith
+  shell: pcs property set stonith-enabled=false
+  when: '"false" not in stonith.stdout'
+
+- name: check quorum
+  shell: pcs property list no-quorum-policy
+  register: quorum
+
+- name: deshabilito el quorum
+  shell: pcs property set no-quorum-policy=ignore
+  when: '"ignore" not in quorum.stdout'
+
+- name: check ip virtual
+  shell: pcs resource
+  register: resources  
+
+- name: creo la ip virtual
+  shell: pcs resource create v_ip ocf:heartbeat:IPaddr2 ip={{ ip_v }} cidr_netmask=32 nic={{ nic }} op monitor interval=20s 
+  when: '"v_ip" not in resources.stdout'
+
+- name: creo el servicio a monitorear
+  shell: pcs resource create core lsb:core op monitor interval=30s op start timeout=180s op stop timeout=180s op status timeout=15
+  when: '"core" not in resources.stdout'
+
+- name: check constraint
+  shell: pcs constraint
+  register: constraint
+ 
+- name: uno a afinidad
+  shell: pcs constraint colocation add core v_ip INFINITY
+  when: '"core with v_ip" not in constraint.stdout'
+
+- name: consrtaint 
+  shell: pcs constraint order v_ip then core
+  when: '"core with v_ip" not in constraint.stdout'

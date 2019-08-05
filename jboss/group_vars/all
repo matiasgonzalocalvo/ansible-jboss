@@ -1,0 +1,89 @@
+# Here are variables related to the standalone JBoss installation
+#Puertos para abrir en el firewall 
+ports:
+  - 22
+  - 8080
+  - 8443
+  - 9990
+  - 9999
+
+#Usuario y password admin para la consola Jboss
+username_adm_jboss: admin
+password_adm_jboss: admin
+password_adm_jboss_b64: YWRtaW4=
+
+#configuracion de la instalacion de jboss
+carpeta_raiz: /DOMAIN/
+jboss: jboss-eap-7.1
+java: jdk1.8.0_191
+user: jboss
+group: jboss
+
+#configuracion para el script de inicio de jboss globales
+JBOSS_NAME: jboss
+JBOSS_CONSOLE_LOG: /var/log/$JBOSS_NAME/console.log
+JBOSS_USER: "jboss"
+JBOSS_BIND: "0.0.0.0"
+JBOSS_MANAGEMENT_BIND: "0.0.0.0"
+JBOSS_ENVIRONMENT: "/etc/profile.d/jboss.sh"
+
+#configuracion para el script de inicio de jboss master
+JBOSS_MODE_MASTER: domain
+JBOSS_DOMAIN_CONFIG: domain.xml
+JBOSS_HOST_CONFIG_MASTER: "host-master.xml"
+JBOSS_DOMAIN_BASE_DIR: "/DOMAIN/master/domain"
+JBOSS_OPTS_MASTER: "-Djboss.domain.base.dir=${JBOSS_DOMAIN_BASE_DIR} -b=${JBOSS_BIND} -bmanagement=${JBOSS_MANAGEMENT_BIND}"
+
+#configuracion para el script de inicio de jboss slave
+JBOSS_MODE_SLAVE: slave
+JBOSS_HOST_CONFIG_SLAVE: "host-slave.xml"
+JBOSS_DOMAIN_BASE_DIR_SLAVE: "/DOMAIN/slave/domain"
+JBOSS_OPTS_SLAVE: "-Djboss.domain.base.dir=${JBOSS_DOMAIN_BASE_DIR} -b=${JBOSS_BIND} -bmanagement=${JBOSS_MANAGEMENT_BIND} -Djboss.domain.master.address=192.168.122.36 "
+
+
+#Grupos del jboss
+server_group_jboss:
+  - name: awm 
+    profile: default
+    socket_binding_group: standard-sockets
+  - name: tienda
+    profile: default
+    socket_binding_group: standard-sockets
+  - name: iipp
+    profile: default
+    socket_binding_group: standard-sockets
+  - name: amm
+    profile: default
+    socket_binding_group: standard-sockets
+  - name: ussd
+    profile: default
+    socket_binding_group: standard-sockets
+  - name: srv_claro
+    profile: default
+    socket_binding_group: standard-sockets
+    jvm_heap: 4096m
+    jvm_heap_max: 4096m
+    jvm_options: -XX:+UseG1GC
+
+jvms:
+  - name: server1
+    host: master0
+    servergroup: srv_claro
+    autostart: true
+    jvm_name: jvm1
+    max_heap_size: 1024m
+    jvm_options:  -XX:+UseG1GC
+    socket_binding_port_offset: 100
+
+#/host=$host/server-config=ci6-server-one:add(group=$serverGroupName, socket-binding-port-offset=100, auto-start=true)
+#/host=$host/server-config=ci6-server-one/jvm=ci6-jvm:add(max-heap-size=$maxHeapSize,permgen-size=$permgenSize,jvm-options=$jvmOptions)
+#/server-group=$serverGroupName:start-servers  
+
+
+master_name: master0
+slaves: slaves
+slave: slave
+
+# AWS specific variables
+# This user name will be set by Tower, when run through Tower
+tower_user_name: admin

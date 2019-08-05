@@ -1,0 +1,9 @@
+cluster_name: prince
+cluster_configure_fence_xvm: false
+cluster_firewall: false
+cluster_group: 'haclient'
+cluster_user: 'hacluster'
+cluster_user_pass: 'hacluster'
+ip_v: '192.168.122.100'
+nic: 'eth0:1'
+

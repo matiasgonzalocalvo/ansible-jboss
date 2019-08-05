@@ -1,0 +1,216 @@
+---
+- name: Instalar paquetes
+  yum:
+    name: "{{ item }}"
+    state: present
+  with_items:
+   - unzip
+   - git
+   - libselinux-python
+   - libsemanage-python
+   - vim
+
+- name: Clonando Git ahi subi el jboss y el java
+  git:
+    force : yes
+    repo: 'https://github.com/matiasgonzalocalvo/Claro-jboss-ansible-standalone.git' 
+    dest: /tmp/claro-jboss
+
+- name: Chequeo si la carpeta "{{ carpeta_raiz }}/{{ jboss }}" existe
+  stat:
+    path: "{{ carpeta_raiz }}/{{ jboss }}"
+  register: stat_jboss
+
+- name: creando directorio "{{ carpeta_raiz }}/{{ jboss }}" 
+  file:
+    path: "{{ carpeta_raiz }}/{{ jboss }}"
+    state: directory
+    mode: 0755
+  when: stat_jboss.stat.exists == False
+
+
+- name: Copiando jboss a carpeta {{ carpeta_raiz }}
+  command: "/bin/cp -r /tmp/claro-jboss/binarios/{{ jboss }}/ {{ carpeta_raiz }}"
+  when: stat_jboss.stat.exists == False
+
+
+
+- name: Chequeo si la carpeta "{{ carpeta_raiz }}/{{ java }}" existe
+  stat:  
+    path: "{{ carpeta_raiz }}/{{ java }}"
+  register: stat_java
+
+  #- name: creando directorio "{{ carpeta_raiz }}/{{ java }}"
+  #  file:
+  #    path: "{{ carpeta_raiz }}/{{ java }}"
+  #    state: directory
+  #    mode: 0755
+  #  when: stat_java.stat.exists == False
+
+- name: Copiando java a carpeta "{{ carpeta_raiz }}"
+  command: "/bin/cp -r /tmp/claro-jboss/binarios/{{ java }}/  {{ carpeta_raiz }}"
+  #  copy: src="/tmp/claro-jboss/binarios/{{ java }}" dest="{{ carpeta_raiz }}" remote_src=yes directory_mode=yes
+  when: stat_java.stat.exists == False
+
+- name: Creando symbolic link de jboss
+  file:
+    src: "{{ carpeta_raiz }}/{{ jboss }}/"
+    dest: "{{ carpeta_raiz }}/jboss"
+    state: link
+
+- name: Creando symbolic link de java
+  file:
+    src: "{{ carpeta_raiz }}/{{ java }}/"
+    dest: "{{ carpeta_raiz }}/java"
+    state: link
+
+    #- name: enable verbose mode
+    # ini_file: dest=/etc/enviroment section=DEFAULT option=verbose value=True backup=yes
+    #tags: configuration
+
+- name: Make sure test file exists
+  file:
+    dest: '/etc/profile.d/jboss.sh'
+    state: 'touch'
+  changed_when: False
+
+- name: Set JAVA_HOME
+  lineinfile:
+    dest: /etc/profile.d/jboss.sh
+    line: "export JAVA_HOME={{ carpeta_raiz }}/java"
+
+
+- name: Set JAVA_HOME
+  lineinfile:
+    dest: /etc/profile.d/jboss.sh
+    state: present
+    regexp: '^export JAVA_HOME'
+    line: "export JAVA_HOME={{ carpeta_raiz }}/java"
+    backrefs: yes
+
+- name: Set JBOSS_HOME
+  lineinfile:
+    dest: /etc/profile.d/jboss.sh
+    line: "export JBOSS_HOME={{ carpeta_raiz }}/jboss"
+
+- name: Set JBOSS_HOME
+  lineinfile:
+    dest: /etc/profile.d/jboss.sh
+    state: present
+    regexp: '^export JBOSS_HOME'
+    line: "export JBOSS_HOME={{ carpeta_raiz }}/jboss"
+    backrefs: yes
+    create: yes
+
+- name: Set PATH
+  lineinfile:
+    dest: /etc/profile.d/jboss.sh
+    line: 'export PATH=$PATH:$JBOSS_HOME/bin:$JAVA_HOME/bin'
+
+- name: Set PATH
+  lineinfile:
+    dest: /etc/profile.d/jboss.sh
+    state: present
+    regexp: '^export PATH'
+    line: 'export PATH=$PATH:$JBOSS_HOME/bin:$JAVA_HOME/bin'
+    backrefs: yes
+
+    #- name: Set export
+    #lineinfile:
+    #dest: /etc/profile.d/jboss.sh
+    #state: present
+    #regexp: '^export PATH JAVA_HOME JBOSS_HOME'
+    #line: 'export PATH JAVA_HOME JBOSS_HOME'
+
+- name: Add group "{{ group }}"
+  group:
+    name: "{{ group }}"
+
+- name: Add user "{{ user }}"
+  user:
+    name: "{{ user }}"
+    group: "{{ user }}"
+    home: "{{ carpeta_raiz }}/jboss/"
+
+- name: Otorgando permisos a la carpeta jboss
+  file:
+    path: "{{ carpeta_raiz }}/{{ jboss }}/"
+    owner: "{{ user }}"
+    group: "{{ group }}"
+    state: directory
+    recurse: yes
+
+    #- name: Copying standalone.xml configuration file
+    #  template:
+    #    src: standalone.xml
+    #    dest: "{{ carpeta_raiz }}/jboss/standalone/configuration/"
+    #  notify: restart jboss
+
+    #- name: Copy the init script
+    #  copy:
+    #    src: jboss-as-standalone.sh
+    #    dest: /etc/init.d/jboss
+    #    mode: 0755
+
+    #- name: Workaround for systemd bug
+    #  shell: service jboss start && chkconfig jboss on
+    #  ignore_errors: yes
+
+    #- name: Enable JBoss to be started at boot
+    #  service:
+    #    name: jboss
+    #    enabled: yes
+    #    state: started
+
+- name: deploy iptables rules
+  template:
+    src: iptables-save
+    dest: /etc/sysconfig/iptables
+  when: ansible_distribution_major_version != "7"
+  notify: restart iptables
+
+- name: Ensure that firewalld is installed
+  yum:
+    name: firewalld
+    state: present
+  when: ansible_distribution_major_version == "7"
+
+- name: Ensure that firewalld is started
+  service:
+    name: firewalld
+    state: started
+  when: ansible_distribution_major_version == "7"
+
+  #- name: deploy firewalld rules
+  #  firewalld:
+  #    immediate: yes
+  #    port: "{{ item }}"
+  #    state: enabled
+  #    permanent: yes
+  #  when: ansible_distribution_major_version == "7"
+  #  with_items:
+  #  - "{{ http_port }}/tcp"
+  #  - "{{ https_port }}/tcp"
+  #  - "{{ https_port_managed }}/tcp"
+
+
+- name: deploy firewalld rules
+  firewalld:
+    immediate: yes
+    port: "{{ item }}/tcp"
+    state: enabled
+    permanent: yes
+  when: ansible_distribution_major_version == "7"
+  with_items:
+  - "{{ ports }}"
+
+
+- name: Agrego el usuario admin para la consola
+  command: "{{ carpeta_raiz }}/{{ jboss }}/bin/add-user.sh -u 'admin' -p 'admin' -g 'admin'"
+
+#- name: 
+- name: Copy the init script
+  copy:
+    src: jboss-eap.sh
+    dest: /etc/init.d/jboss
+    mode: 0755

@@ -1,0 +1,152 @@
+---
+- name: Chequeo si el archivo "{{ carpeta_raiz }}/{{ jboss }}/domain/configuration/claro-host-slave.xml" existe
+  stat:
+    path: "{{ carpeta_raiz }}/{{ jboss }}/domain/configuration/claro-host-slave.xml"
+  register: stat_host_slave_xml
+
+- name: Copiando archivo host-slave.xml
+  command: "/bin/cp {{ carpeta_raiz }}/{{ jboss }}/domain/configuration/host-slave.xml {{ carpeta_raiz }}/{{ jboss }}/domain/configuration/claro-host-slave.xml"
+  when: stat_host_slave_xml.stat.exists == False
+
+- name: configurando nombre del host slave
+  shell: name_slave=$(jboss-cli.sh "embed-host-controller --host-config=claro-host-slave.xml,ls /host") && jboss-cli.sh "embed-host-controller --host-config=claro-host-slave.xml,/host=${name_slave}:write-attribute(name=name,value={{ ansible_hostname }})"
+  when: stat_host_slave_xml.stat.exists == False
+
+
+- name: configurando la password para conectarme al master
+  shell: jboss-cli.sh "embed-host-controller --host-config=claro-host-slave.xml,/host={{ ansible_hostname }}/core-service=management/security-realm=ManagementRealm/server-identity=secret:write-attribute(name=value,value=\"{{ password_adm_jboss_b64 }}\")"
+  when: stat_host_slave_xml.stat.exists == False
+
+- name: configurando username para conectarse al master
+  shell: jboss-cli.sh "embed-host-controller --host-config=claro-host-slave.xml,/host={{ ansible_hostname }}:write-remote-domain-controller(username={{ password_adm_jboss }},security-realm=ManagementRealm)"
+  when: stat_host_slave_xml.stat.exists == False
+
+- name: Borrando server-one y server-twho
+  shell: servers=$(jboss-cli.sh "embed-host-controller --host-config=claro-host-slave.xml,ls /host={{ ansible_hostname }}/server=") && for i in ${servers} ; do if [ ${i} == server-one -o ${i} == server-two ] ; then jboss-cli.sh "embed-host-controller --host-config=claro-host-slave.xml,/host={{ ansible_hostname }}/server-config=${i}:remove()" ; fi  ; done
+
+
+- name: Chequeo si la carpeta "{{ carpeta_raiz }}/slave/domain" existe
+  stat:
+    path: "{{ carpeta_raiz }}/slave/domain"
+  register: stat_slave
+
+- name: Creando carpeta "{{ carpeta_raiz }}/slave/domain/"
+  file: path="{{ carpeta_raiz }}/slave/domain/" state=directory
+  when: stat_slave.stat.exists == False
+
+- name: Copiando archivos domain
+  command: "/bin/cp -r {{ carpeta_raiz }}/{{ jboss }}/domain {{ carpeta_raiz }}/slave"
+  when: stat_slave.stat.exists == False
+
+- name: Otorgando permisos a la carpeta "{{ carpeta_raiz }}/slave/domain/"
+  file:
+    path: "{{ carpeta_raiz }}/slave/"
+    owner: "{{ user }}"
+    group: "{{ group }}"
+    state: directory
+    recurse: yes
+  when: stat_slave.stat.exists == False
+
+
+- name: Copiando archivos domain
+  command: "/bin/cp -r {{ carpeta_raiz }}/slave/domain/configuration/claro-host-slave.xml {{ carpeta_raiz }}/slave/domain/configuration/host-slave.xml"
+  when: stat_slave.stat.exists == False
+
+
+- name: Set JBOSS_NAME init script
+  lineinfile:
+    dest: /etc/init.d/jboss
+    state: present
+    regexp: '^JBOSS_NAME='
+    line: "JBOSS_NAME=\"{{ JBOSS_NAME }}\""
+    backrefs: yes
+
+- name: Set JBOSS_CONSOLE_LOG init script
+  lineinfile:
+    dest: /etc/init.d/jboss
+    state: present
+    regexp: '^JBOSS_CONSOLE_LOG='
+    line: "JBOSS_CONSOLE_LOG=\"{{ JBOSS_CONSOLE_LOG }}\""
+    backrefs: yes
+
+- name: Set JBOSS_MODE init script
+  lineinfile:
+    dest: /etc/init.d/jboss
+    state: present
+    regexp: '^JBOSS_MODE='
+    line: "JBOSS_MODE=\"{{ JBOSS_MODE_SLAVE }}\""
+    backrefs: yes
+
+- name: Set JBOSS_DOMAIN_CONFIG init script
+  lineinfile:
+    dest: /etc/init.d/jboss
+    state: present
+    regexp: '^JBOSS_DOMAIN_CONFIG='
+    line: "JBOSS_DOMAIN_CONFIG=\"{{ JBOSS_DOMAIN_CONFIG }}\""
+    backrefs: yes
+
+- name: Set JBOSS_HOST_CONFIG init script
+  lineinfile:
+    dest: /etc/init.d/jboss
+    state: present
+    regexp: '^JBOSS_HOST_CONFIG='
+    line: "JBOSS_HOST_CONFIG=\"{{ JBOSS_HOST_CONFIG_SLAVE }}\""
+    backrefs: yes
+
+- name: Set JBOSS_USER init script
+  lineinfile:
+    dest: /etc/init.d/jboss
+    state: present
+    regexp: '^JBOSS_USER='
+    line: "JBOSS_USER=\"{{ user }}\""
+    backrefs: yes
+
+- name: Set JBOSS_DOMAIN_BASE_DIR init script
+  lineinfile:
+    dest: /etc/init.d/jboss
+    state: present
+    regexp: '^JBOSS_DOMAIN_BASE_DIR='
+    line: "JBOSS_DOMAIN_BASE_DIR=\"{{ JBOSS_DOMAIN_BASE_DIR_SLAVE }}\""
+    backrefs: yes
+
+- name: Set JBOSS_BIND init script
+  lineinfile:
+    dest: /etc/init.d/jboss
+    state: present
+    regexp: '^JBOSS_BIND='
+    line: "JBOSS_BIND=\"{{ JBOSS_BIND }}\""
+    backrefs: yes
+
+- name: Set JBOSS_MANAGEMENT_BIND init script
+  lineinfile:
+    dest: /etc/init.d/jboss
+    state: present
+    regexp: '^JBOSS_MANAGEMENT_BIND='
+    line: "JBOSS_MANAGEMENT_BIND=\"{{ JBOSS_MANAGEMENT_BIND }}\""
+    backrefs: yes
+
+- name: Set JBOSS_OPTS init script
+  lineinfile:
+    dest: /etc/init.d/jboss
+    state: present
+    regexp: '^JBOSS_OPTS='
+    line: "JBOSS_OPTS=\"{{ JBOSS_OPTS_SLAVE }}\""
+    backrefs: yes
+
+- name: Set JBOSS_ENVIRONMENT init script
+  lineinfile:
+    dest: /etc/init.d/jboss
+    state: present
+    regexp: '^JBOSS_ENVIRONMENT='
+    line: "JBOSS_ENVIRONMENT=\"{{ JBOSS_ENVIRONMENT }}\""
+    backrefs: yes
+
+- name: Workaround for systemd bug
+  shell: service jboss start && chkconfig jboss on
+  #  ignore_errors: yes
+
+- name: Enable JBoss to be started at boot
+  service:
+    name: jboss
+    enabled: yes
+    state: started

@@ -1,0 +1,200 @@
+---
+- name: Chequeo si el archivo "{{ carpeta_raiz }}/{{ jboss }}/domain/configuration/claro-domain.xml" existe
+  stat:
+    path: "{{ carpeta_raiz }}/{{ jboss }}/domain/configuration/claro-domain.xml"
+  register: stat_domain_xml
+
+- name: Copiando archivos domain.xml
+  command: "/bin/cp {{ carpeta_raiz }}/{{ jboss }}/domain/configuration/domain.xml {{ carpeta_raiz }}/{{ jboss }}/domain/configuration/claro-domain.xml"
+  when: stat_domain_xml.stat.exists == False
+
+
+- name: Chequeo si el archivo "{{ carpeta_raiz }}/{{ jboss }}/domain/configuration/claro-host-master.xml" existe
+  stat:
+    path: "{{ carpeta_raiz }}/{{ jboss }}/domain/configuration/claro-host-master.xml"
+  register: stat_host_master_xml
+
+- name: Copiando archivo host-master.xml 
+  command: "/bin/cp {{ carpeta_raiz }}/{{ jboss }}/domain/configuration/host-master.xml {{ carpeta_raiz }}/{{ jboss }}/domain/configuration/claro-host-master.xml"
+  when: stat_host_master_xml.stat.exists == False
+
+
+- name: configurando nombre del master
+  shell: name_master=$(jboss-cli.sh "embed-host-controller --domain-config=claro-domain.xml --host-config=claro-host-master.xml,ls /host") && jboss-cli.sh "embed-host-controller --domain-config=claro-domain.xml --host-config=claro-host-master.xml,/host=${name_master}:write-attribute(name=name,value={{ ansible_hostname }})"
+  when: stat_domain_xml.stat.exists == False
+
+- name: borrando server group creados por default
+  shell: grupos=$(jboss-cli.sh "embed-host-controller --domain-config=claro-domain.xml --host-config=claro-host-master.xml,ls /server-group=") && for i in ${grupos} ; do if [ ${i} == other-server-group -o ${i} == main-server-group ] ; then jboss-cli.sh "embed-host-controller --domain-config=claro-domain.xml --host-config=claro-host-master.xml,/server-group=${i}:remove()" ; fi  ; done
+  
+
+- name: Creando Grupos
+  shell: flag=0 && grupos=$(jboss-cli.sh "embed-host-controller --domain-config=claro-domain.xml --host-config=claro-host-master.xml,ls /server-group=") && for i in ${grupos} ; do if [ "${i}" ==  "{{ item.name }}" ] ; then flag=1 ; fi done && if [ ${flag} -eq 0 ] ; then jboss-cli.sh "embed-host-controller --domain-config=claro-domain.xml --host-config=claro-host-master.xml,/server-group={{ item.name }}:add(profile={{ item.profile }},socket-binding-group={{ item.socket_binding_group }})" ; else echo "ya existia el grupo" ; fi
+  when: ansible_distribution_major_version == "7"
+  with_items: "{{ server_group_jboss }}"
+
+
+- name: Chequeo si la carpeta "{{ carpeta_raiz }}/master/domain" existe
+  stat:
+    path: "{{ carpeta_raiz }}/master/domain"
+  register: stat_master
+
+- name: Creando carpeta "{{ carpeta_raiz }}/master/domain/"
+  file: path="{{ carpeta_raiz }}/master/domain/" state=directory
+  when: stat_master.stat.exists == False
+
+- name: Copiando archivos domain
+  command: "/bin/cp -r {{ carpeta_raiz }}/{{ jboss }}/domain {{ carpeta_raiz }}/master"
+  when: stat_master.stat.exists == False
+
+- name: Otorgando permisos a la carpeta "{{ carpeta_raiz }}/master/domain/"
+  file:
+    path: "{{ carpeta_raiz }}/master/"
+    owner: "{{ user }}"
+    group: "{{ group }}"
+    state: directory
+    recurse: yes
+  when: stat_master.stat.exists == False
+
+- name: Copiando archivo claro-host-master.xml a host-master.xml
+  command: "/bin/cp {{ carpeta_raiz }}/master/domain//configuration/claro-host-master.xml {{ carpeta_raiz }}/master/domain/configuration/host-master.xml"
+  when: stat_master.stat.exists == False
+
+- name: Copiando archivo claro-domain.xml a domain.xml
+  command: "/bin/cp {{ carpeta_raiz }}/master/domain//configuration/claro-domain.xml {{ carpeta_raiz }}/master/domain/configuration/domain.xml"
+  when: stat_master.stat.exists == False
+
+
+- name: Set JBOSS_NAME init script
+  lineinfile:
+    dest: /etc/init.d/jboss
+    state: present
+    regexp: '^JBOSS_NAME='
+    line: "JBOSS_NAME=\"{{ JBOSS_NAME }}\""
+    backrefs: yes
+
+- name: Set JBOSS_CONSOLE_LOG init script
+  lineinfile:
+    dest: /etc/init.d/jboss
+    state: present
+    regexp: '^JBOSS_CONSOLE_LOG='
+    line: "JBOSS_CONSOLE_LOG=\"{{ JBOSS_CONSOLE_LOG }}\""
+    backrefs: yes
+
+- name: Set JBOSS_MODE init script
+  lineinfile:
+    dest: /etc/init.d/jboss
+    state: present
+    regexp: '^JBOSS_MODE='
+    line: "JBOSS_MODE=\"{{ JBOSS_MODE_MASTER }}\""
+    backrefs: yes
+
+- name: Set JBOSS_DOMAIN_CONFIG init script
+  lineinfile:
+    dest: /etc/init.d/jboss
+    state: present
+    regexp: '^JBOSS_DOMAIN_CONFIG='
+    line: "JBOSS_DOMAIN_CONFIG=\"{{ JBOSS_DOMAIN_CONFIG }}\""
+    backrefs: yes
+
+- name: Set JBOSS_HOST_CONFIG init script
+  lineinfile:
+    dest: /etc/init.d/jboss
+    state: present
+    regexp: '^JBOSS_HOST_CONFIG='
+    line: "JBOSS_HOST_CONFIG=\"{{ JBOSS_HOST_CONFIG_MASTER }}\""
+    backrefs: yes
+
+- name: Set JBOSS_USER init script
+  lineinfile:
+    dest: /etc/init.d/jboss
+    state: present
+    regexp: '^JBOSS_USER='
+    line: "JBOSS_USER=\"{{ user }}\""
+    backrefs: yes
+
+- name: Set JBOSS_DOMAIN_BASE_DIR init script
+  lineinfile:
+    dest: /etc/init.d/jboss
+    state: present
+    regexp: '^JBOSS_DOMAIN_BASE_DIR='
+    line: "JBOSS_DOMAIN_BASE_DIR=\"{{ JBOSS_DOMAIN_BASE_DIR }}\""
+    backrefs: yes
+
+- name: Set JBOSS_BIND init script
+  lineinfile:
+    dest: /etc/init.d/jboss
+    state: present
+    regexp: '^JBOSS_BIND='
+    line: "JBOSS_BIND=\"{{ JBOSS_BIND }}\""
+    backrefs: yes
+
+- name: Set JBOSS_MANAGEMENT_BIND init script
+  lineinfile:
+    dest: /etc/init.d/jboss
+    state: present
+    regexp: '^JBOSS_MANAGEMENT_BIND='
+    line: "JBOSS_MANAGEMENT_BIND=\"{{ JBOSS_MANAGEMENT_BIND }}\""
+    backrefs: yes
+
+- name: Set JBOSS_OPTS init script
+  lineinfile:
+    dest: /etc/init.d/jboss
+    state: present
+    regexp: '^JBOSS_OPTS='
+    line: "JBOSS_OPTS=\"{{ JBOSS_OPTS_MASTER }}\""
+    backrefs: yes
+
+- name: Set JBOSS_ENVIRONMENT init script
+  lineinfile:
+    dest: /etc/init.d/jboss
+    state: present
+    regexp: '^JBOSS_ENVIRONMENT='
+    line: "JBOSS_ENVIRONMENT=\"{{ JBOSS_ENVIRONMENT }}\""
+    backrefs: yes
+
+
+
+
+- name: Workaround for systemd bug
+  shell: service jboss start && chkconfig jboss on
+  #  ignore_errors: yes
+
+- name: Enable JBoss to be started at boot
+  service:
+    name: jboss
+    enabled: yes
+    state: started
+
+    #- name: Cambio el nombre del master a {{ master_name }}
+    #  shell: name_master=$(jboss-cli.sh -u=admin -p=admin -c --command="ls /host") && jboss-cli.sh -u=admin -p=admin -c --command="/host=${name_master}:write-attribute(name=name,value={{ master_name }})" && jboss-cli.sh -u=admin -p=admin -c --command="/host=${name_master}:reload"
+
+    #- name: borrando server group creados por default
+    #  shell: grupos=$(jboss-cli.sh -u=admin -p=admin -c --command="ls /server-group=") && for i in ${grupos} ; do if [ ${i} == other-server-group -o ${i} == main-server-group ] ; then jboss-cli.sh -u=admin -p=admin -c --command="/server-group=${i}:remove()" ; fi  ; done 
+
+    #- name: Creando Grupos  
+    #  shell: flag=0 && grupos=$(jboss-cli.sh -u=admin -p=admin -c --command="ls /server-group=") && for i in ${grupos} ; do if [ "${i}" ==  "{{ item.name }}" ] ; then flag=1 ; fi done && if [ ${flag} -eq 0 ] ; then jboss-cli.sh -u=admin -p=admin -c --command="/server-group={{ item.name }}:add(profile={{ item.profile }},socket-binding-group={{ item.socket_binding_group }})" ; else echo "ya existia el grupo" ; fi
+    #  when: ansible_distribution_major_version == "7"
+    #  with_items: "{{ server_group_jboss }}"
+
+
+
+  #- name: Creando Grupos
+#  shell: flag=0 && grupos=$(jboss-cli.sh -u=admin -p=admin -c --command="ls /server-group=") && for i in ${grupos} ; do if [ "${i}" ==  "{{ item }}" ] ; then flag=1 ; fi done && if [ ${flag} -eq 0 ] ; then jboss-cli.sh -u=admin -p=admin -c --command="/server-group={{ item }}:add(profile=ha,socket-binding-group=ha-sockets)" ; else echo "ya existia el grupo" ; fi
+#  when: ansible_distribution_major_version == "7"
+#  with_items:
+#  - "{{ servers_group_jboss }}"
+
+
+
+  #- name: "Configurando nombre de master {{ master_name }}"
+  #  command: "/bin/sed 's/<host xmlns="urn:jboss:domain:5.0" name="master">/<host xmlns="urn:jboss:domain:5.0" name="{{ master_name  }}">/g' "
+  #  when: stat_master.stat.exists == False
+  #
+  #- name: set name for slave
+  #  command: "sed -i 's/<host xmlns=\"urn:jboss:domain:5.0\" name=\"master\">/<host xmlns=\"urn:jboss:domain:5.0\" name=\"{{ master_name }}\">/' {{ carpeta_raiz }}/master/domain/configuration/host-master.xml"
+
+
+  #- name: Remove the subjective attribute of the rating element
+  #  command: "sed -i '/<server-group name=\"main-server-group\"*/,/<\\/server-group>/d\' /opt/master/domain/configuration/domain.xml"
+  #
+
